@@ -108,7 +108,7 @@ class BreakerPanelCard extends HTMLElement {
   updateBreakerState(breaker, element) {
     // Verifica se o disjuntor deve ser marcado como indisponível
     // Apenas se tiver um switch configurado e não for empty ou apenas DPS
-    if (breaker.switch && !breaker.empty && !breaker.dps) {
+    if (breaker.switch && !breaker.empty && !(breaker.dps && !breaker.switch)) {
       const switchUnavailable = this.isEntityUnavailable(breaker.switch);
       
       // Adiciona a classe de indisponível se necessário
@@ -123,9 +123,9 @@ class BreakerPanelCard extends HTMLElement {
       }
     }
 
-    // Verificar switch (disjuntor ligado/desligado) se não for DPS
+    // Verificar switch (disjuntor ligado/desligado)
     let isOn = true;
-    if (breaker.switch && this._hass.states[breaker.switch] && !breaker.dps) {
+    if (breaker.switch && this._hass.states[breaker.switch]) {
       isOn = this._hass.states[breaker.switch].state === 'on';
       
       // Atualizar classe do elemento
@@ -210,7 +210,7 @@ class BreakerPanelCard extends HTMLElement {
     }
     
     // Atualizar o estilo baseado no estado
-    if (!isOn && !element.classList.contains('unavailable') && !breaker.dps) {
+    if (!isOn && !element.classList.contains('unavailable')) {
       // Deixar textos em cinza se desligado
       const textElements = element.querySelectorAll('.info-value');
       textElements.forEach(el => {
@@ -335,16 +335,6 @@ class BreakerPanelCard extends HTMLElement {
           flex-shrink: 0;
           margin-right: 16px;
         }
-
-        .dps-handle-container {
-          width: 40px;
-          height: 60px;
-          flex-shrink: 0;
-          margin-right: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
         
         .main-breaker-handle {
           position: absolute;
@@ -438,8 +428,11 @@ class BreakerPanelCard extends HTMLElement {
         }
         
         .dps-icon {
-          width: 30px;
-          height: 30px;
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          width: 24px;
+          height: 24px;
           fill: var(--dps-color);
         }
         
@@ -466,16 +459,6 @@ class BreakerPanelCard extends HTMLElement {
           position: relative;
           flex-shrink: 0;
           margin-right: 12px;
-        }
-
-        .dps-icon-container {
-          width: 30px;
-          height: 50px;
-          flex-shrink: 0;
-          margin-right: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
         }
         
         .breaker-handle {
@@ -650,23 +633,20 @@ class BreakerPanelCard extends HTMLElement {
                 id="main-breaker-${index}" 
                 data-entity-id="${breaker.switch || ''}">
               <div class="main-breaker-header">
-                ${isDPS ? `
-                  <div class="dps-handle-container">
-                    <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                      <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
-                    </svg>
-                  </div>
-                ` : `
-                  <div class="main-breaker-handle-container">
-                    <div class="main-breaker-handle"></div>
-                  </div>
-                `}
+                <div class="main-breaker-handle-container">
+                  <div class="main-breaker-handle"></div>
+                </div>
                 <div class="main-breaker-title-container">
                   <div class="main-breaker-title">
                     ${breaker.name || `Fase ${index === 0 ? 'A' : 'B'}`}
                     ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
                   </div>
                   <div class="unavailable-message">Dispositivo indisponível</div>
+                  ${isDPS ? `
+                    <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
+                    </svg>
+                  ` : ''}
                 </div>
               </div>
               <div class="info-panel">
@@ -734,23 +714,20 @@ class BreakerPanelCard extends HTMLElement {
             id="breaker-${index}" 
             data-entity-id="${breaker.switch || ''}">
           <div class="breaker-header">
-            ${isDPS ? `
-              <div class="dps-icon-container">
-                <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
-                </svg>
-              </div>
-            ` : `
-              <div class="breaker-handle-container">
-                <div class="breaker-handle"></div>
-              </div>
-            `}
+            <div class="breaker-handle-container">
+              <div class="breaker-handle"></div>
+            </div>
             <div class="breaker-title-container">
               <div class="breaker-title">
                 ${breaker.name || `Disjuntor ${index + 1}`}
                 ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
               </div>
               <div class="unavailable-message">Dispositivo indisponível</div>
+              ${isDPS ? `
+                <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
+                </svg>
+              ` : ''}
             </div>
           </div>
           <div class="info-panel">
@@ -806,7 +783,6 @@ class BreakerPanelCard extends HTMLElement {
 
 // Registra o elemento no Custom Elements Registry
 customElements.define('breaker-panel-card', BreakerPanelCard);
-
 
 // Configura a janela para usar o card
 window.customCards = window.customCards || [];
