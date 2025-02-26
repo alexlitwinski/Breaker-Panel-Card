@@ -61,6 +61,39 @@ class BreakerPanelCard extends HTMLElement {
     });
   }
 
+  // Determina a unidade de potência e formata o valor adequadamente
+  formatPower(power, entity) {
+    // Verifica se temos entidade e estado disponível
+    if (!entity || !this._hass.states[entity]) {
+      return "0W";
+    }
+    
+    // Busca os atributos da entidade
+    const attributes = this._hass.states[entity].attributes || {};
+    
+    // Determina a unidade pela unidade de medida fornecida
+    let unit = attributes.unit_of_measurement || "W";
+    unit = unit.toLowerCase(); // Normalizar para comparação
+    
+    if (unit === "kw" || unit === "kW") {
+      // É kilowatt - mostra 3 casas decimais
+      return power.toFixed(3) + " kW";
+    } else if (unit === "w" || unit === "W") {
+      // É watt - mostra sem casas decimais
+      return power.toFixed(0) + "W";
+    } else {
+      // Caso não identifique a unidade ou seja outra qualquer
+      // Tenta inferir pela magnitude do valor
+      if (power > 1000) {
+        // Valor alto provavelmente em watts
+        return power.toFixed(0) + "W";
+      } else {
+        // Valor baixo provavelmente em kilowatts
+        return power.toFixed(3) + " kW";
+      }
+    }
+  }
+
   // Atualiza o estado de um disjuntor específico
   updateBreakerState(breaker, element) {
     // Verificar switch (disjuntor ligado/desligado)
@@ -73,7 +106,8 @@ class BreakerPanelCard extends HTMLElement {
       element.classList.toggle('off', !isOn);
       
       // Atualizar alavanca do disjuntor
-      const handle = element.querySelector('.breaker-handle');
+      const handleClass = element.classList.contains('main-breaker') ? '.main-breaker-handle' : '.breaker-handle';
+      const handle = element.querySelector(handleClass);
       if (handle) {
         handle.classList.toggle('on', isOn);
         handle.classList.toggle('off', !isOn);
@@ -119,7 +153,8 @@ class BreakerPanelCard extends HTMLElement {
       power = parseFloat(this._hass.states[breaker.power_entity].state) || 0;
       const powerElement = element.querySelector('.power-value');
       if (powerElement) {
-        powerElement.textContent = power.toFixed(0) + 'W';
+        // Usar a função de formatação automática de potência
+        powerElement.textContent = this.formatPower(power, breaker.power_entity);
       }
     }
     
@@ -169,6 +204,18 @@ class BreakerPanelCard extends HTMLElement {
     }
   }
 
+  // Método para manipular clique em disjuntores
+  _toggleBreaker(entityId) {
+    if (!this._hass || !entityId) return;
+
+    const state = this._hass.states[entityId].state;
+    const service = state === 'on' ? 'turn_off' : 'turn_on';
+    
+    this._hass.callService('switch', service, {
+      entity_id: entityId
+    });
+  }
+
   // Método para renderizar o card
   render() {
     this.shadowRoot.innerHTML = `
@@ -196,6 +243,9 @@ class BreakerPanelCard extends HTMLElement {
           --primary-text: var(--primary-text-color, #212121);
           --secondary-text: var(--secondary-text-color, #727272);
           --empty-breaker-bg: rgba(0, 0, 0, 0.05);
+          --dps-color: #ff9800;
+          --dps-background: rgba(255, 152, 0, 0.1);
+          --dps-border: rgba(255, 152, 0, 0.3);
         }
         
         .card-header {
@@ -273,6 +323,8 @@ class BreakerPanelCard extends HTMLElement {
         .main-breaker-title {
           font-size: 16px;
           font-weight: 500;
+          display: flex;
+          align-items: center;
         }
         
         .main-breaker-content {
@@ -304,6 +356,30 @@ class BreakerPanelCard extends HTMLElement {
         
         .breaker.off {
           opacity: 0.85;
+        }
+        
+        /* Estilo para DPS */
+        .breaker.dps, .main-breaker.dps {
+          background-color: var(--dps-background);
+          border: 1px solid var(--dps-border);
+        }
+        
+        .dps-icon {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          width: 24px;
+          height: 24px;
+          fill: var(--dps-color);
+        }
+        
+        .dps-badge {
+          font-size: 10px;
+          background-color: var(--dps-color);
+          color: white;
+          padding: 2px 6px;
+          border-radius: 10px;
+          margin-left: 8px;
         }
         
         .breaker-header {
@@ -343,6 +419,8 @@ class BreakerPanelCard extends HTMLElement {
         .breaker-title {
           font-weight: 500;
           color: var(--primary-text);
+          display: flex;
+          align-items: center;
         }
         
         .info-panel {
@@ -419,6 +497,34 @@ class BreakerPanelCard extends HTMLElement {
         }
       </style>
     `;
+
+    // Adicionar event listeners para os clicks
+    this.addBreakerClickListeners();
+  }
+
+  // Adicionar event listeners para os disjuntores
+  addBreakerClickListeners() {
+    // Para disjuntores principais
+    const mainBreakers = this.shadowRoot.querySelectorAll('.main-breaker.clickable');
+    mainBreakers.forEach(breaker => {
+      breaker.addEventListener('click', () => {
+        const entityId = breaker.getAttribute('data-entity-id');
+        if (entityId) {
+          this._toggleBreaker(entityId);
+        }
+      });
+    });
+
+    // Para disjuntores normais
+    const normalBreakers = this.shadowRoot.querySelectorAll('.breaker.clickable');
+    normalBreakers.forEach(breaker => {
+      breaker.addEventListener('click', () => {
+        const entityId = breaker.getAttribute('data-entity-id');
+        if (entityId) {
+          this._toggleBreaker(entityId);
+        }
+      });
+    });
   }
 
   // Método para renderizar os disjuntores principais
@@ -441,16 +547,31 @@ class BreakerPanelCard extends HTMLElement {
             `;
           }
 
-          const handleClass = breaker.switch ? '' : 'on';
+          // Verificar se é DPS
+          const isDPS = breaker.dps === true;
+          const dpsClass = isDPS ? 'dps' : '';
+          
+          // Configurar classes
           const breakerClass = isPrimary ? 'primary' : '';
+          const clickable = breaker.switch ? 'clickable' : '';
           
           return `
-            <div class="main-breaker ${handleClass} ${breakerClass}" id="main-breaker-${index}">
+            <div class="main-breaker ${breakerClass} ${dpsClass} ${clickable}" 
+                id="main-breaker-${index}" 
+                data-entity-id="${breaker.switch || ''}">
               <div class="main-breaker-header">
                 <div class="main-breaker-handle-container">
-                  <div class="main-breaker-handle ${handleClass}"></div>
+                  <div class="main-breaker-handle"></div>
                 </div>
-                <div class="main-breaker-title">${breaker.name || `Fase ${index === 0 ? 'A' : 'B'}`}</div>
+                <div class="main-breaker-title">
+                  ${breaker.name || `Fase ${index === 0 ? 'A' : 'B'}`}
+                  ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
+                </div>
+                ${isDPS ? `
+                  <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
+                  </svg>
+                ` : ''}
               </div>
               <div class="info-panel">
                 <div class="main-breaker-content">
@@ -501,21 +622,30 @@ class BreakerPanelCard extends HTMLElement {
         `;
       }
 
-      const handleClass = breaker.switch ? '' : 'on';
+      // Verificar se é DPS
+      const isDPS = breaker.dps === true;
+      const dpsClass = isDPS ? 'dps' : '';
+      
+      // Configurar classes
       const clickable = breaker.switch ? 'clickable' : '';
       
       return `
-        <div class="breaker ${handleClass} ${clickable}" id="breaker-${index}" 
-          ${breaker.switch ? `onClick="(function(el) { 
-            const event = new Event('breaker-click');
-            el.dataset.entityId = '${breaker.switch}';
-            el.dispatchEvent(event);
-          })(this);"` : ''}>
+        <div class="breaker ${dpsClass} ${clickable}" 
+            id="breaker-${index}" 
+            data-entity-id="${breaker.switch || ''}">
           <div class="breaker-header">
             <div class="breaker-handle-container">
-              <div class="breaker-handle ${handleClass}"></div>
+              <div class="breaker-handle"></div>
             </div>
-            <div class="breaker-title">${breaker.name || `Disjuntor ${index + 1}`}</div>
+            <div class="breaker-title">
+              ${breaker.name || `Disjuntor ${index + 1}`}
+              ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
+            </div>
+            ${isDPS ? `
+              <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
+              </svg>
+            ` : ''}
           </div>
           <div class="info-panel">
             <div class="breaker-info">
@@ -550,21 +680,6 @@ class BreakerPanelCard extends HTMLElement {
         </div>
       `;
     }).join('');
-  }
-
-  // Manipulador de eventos para cliques nos disjuntores
-  connectedCallback() {
-    this.shadowRoot.addEventListener('breaker-click', (e) => {
-      const entityId = e.target.dataset.entityId;
-      if (entityId && this._hass) {
-        const currentState = this._hass.states[entityId].state;
-        const newState = currentState === 'on' ? 'off' : 'on';
-        
-        this._hass.callService('switch', 'turn_' + newState, {
-          entity_id: entityId
-        });
-      }
-    });
   }
 
   // Define o tamanho do card
