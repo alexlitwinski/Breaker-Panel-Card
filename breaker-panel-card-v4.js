@@ -106,17 +106,20 @@ class BreakerPanelCard extends HTMLElement {
 
   // Atualiza o estado de um disjuntor específico
   updateBreakerState(breaker, element) {
-    // Verifica se a entidade principal (switch) está indisponível
-    const switchUnavailable = this.isEntityUnavailable(breaker.switch);
-    
-    // Adiciona a classe de indisponível se necessário
-    element.classList.toggle('unavailable', switchUnavailable);
-    
-    // Se o switch estiver indisponível, mostra mensagem de erro
-    if (switchUnavailable) {
-      const errorMsg = element.querySelector('.unavailable-message');
-      if (errorMsg) {
-        errorMsg.style.display = 'block';
+    // Verifica se o disjuntor deve ser marcado como indisponível
+    // Apenas se tiver um switch configurado e não for empty ou apenas DPS
+    if (breaker.switch && !breaker.empty && !(breaker.dps && !breaker.switch)) {
+      const switchUnavailable = this.isEntityUnavailable(breaker.switch);
+      
+      // Adiciona a classe de indisponível se necessário
+      element.classList.toggle('unavailable', switchUnavailable);
+      
+      // Se o switch estiver indisponível, mostra mensagem de erro
+      if (switchUnavailable) {
+        const errorMsg = element.querySelector('.unavailable-message');
+        if (errorMsg) {
+          errorMsg.style.display = 'block';
+        }
       }
     }
 
@@ -207,7 +210,7 @@ class BreakerPanelCard extends HTMLElement {
     }
     
     // Atualizar o estilo baseado no estado
-    if (!isOn && !switchUnavailable) {
+    if (!isOn && !element.classList.contains('unavailable')) {
       // Deixar textos em cinza se desligado
       const textElements = element.querySelectorAll('.info-value');
       textElements.forEach(el => {
@@ -393,6 +396,12 @@ class BreakerPanelCard extends HTMLElement {
           transition: all 0.3s ease-in-out;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
           overflow: hidden;
+        }
+        
+        /* Estilo para disjuntores duplos (ocupa duas linhas) */
+        .breaker.double {
+          grid-row: span 2;
+          height: auto;
         }
         
         .breaker.off {
@@ -693,11 +702,15 @@ class BreakerPanelCard extends HTMLElement {
       const isDPS = breaker.dps === true;
       const dpsClass = isDPS ? 'dps' : '';
       
+      // Verificar se é disjuntor duplo
+      const isDouble = breaker.double === true;
+      const doubleClass = isDouble ? 'double' : '';
+      
       // Configurar classes
       const clickable = breaker.switch ? 'clickable' : '';
       
       return `
-        <div class="breaker ${dpsClass} ${clickable}" 
+        <div class="breaker ${dpsClass} ${doubleClass} ${clickable}" 
             id="breaker-${index}" 
             data-entity-id="${breaker.switch || ''}">
           <div class="breaker-header">
@@ -755,7 +768,14 @@ class BreakerPanelCard extends HTMLElement {
   // Define o tamanho do card
   getCardSize() {
     const mainBreakersSize = this.mainBreakers.length > 0 ? 2 : 0;
-    const regularBreakersSize = Math.ceil(this.breakers.length / this.columns);
+    
+    // Calcular o tamanho considerando disjuntores duplos
+    let regularBreakersSize = 0;
+    this.breakers.forEach(breaker => {
+      regularBreakersSize += (breaker.double === true) ? 2 : 1;
+    });
+    
+    regularBreakersSize = Math.ceil(regularBreakersSize / this.columns);
     
     return mainBreakersSize + regularBreakersSize + 1;
   }
@@ -770,4 +790,4 @@ window.customCards.push({
   type: 'breaker-panel-card',
   name: 'Quadro de Distribuição',
   description: 'Card que simula um quadro de distribuição de energia com monitoramento de disjuntores.'
-});v
+});
