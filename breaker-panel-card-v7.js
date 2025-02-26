@@ -115,11 +115,9 @@ class BreakerPanelCard extends HTMLElement {
       element.classList.toggle('unavailable', switchUnavailable);
       
       // Se o switch estiver indisponível, mostra mensagem de erro
-      if (switchUnavailable) {
-        const errorMsg = element.querySelector('.unavailable-message');
-        if (errorMsg) {
-          errorMsg.style.display = 'block';
-        }
+      const errorMsg = element.querySelector('.unavailable-message');
+      if (errorMsg) {
+        errorMsg.style.display = switchUnavailable ? 'block' : 'none';
       }
     }
 
@@ -416,24 +414,16 @@ class BreakerPanelCard extends HTMLElement {
         
         /* Estilo para disjuntores indisponíveis */
         .breaker.unavailable, .main-breaker.unavailable {
-          background-color: var(--unavailable-color);
-          border: 1px solid var(--unavailable-border);
+          background-color: var(--error-color, #db4437);
+          border: 1px solid var(--error-color, #db4437);
+          opacity: 0.8;
         }
         
         .unavailable-message {
-          color: var(--error-color, #db4437);
+          color: white;
           font-size: 11px;
           margin-top: 4px;
           display: none;
-        }
-        
-        .dps-icon {
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          width: 24px;
-          height: 24px;
-          fill: var(--dps-color);
         }
         
         .dps-badge {
@@ -442,7 +432,7 @@ class BreakerPanelCard extends HTMLElement {
           color: white;
           padding: 2px 6px;
           border-radius: 10px;
-          margin-left: 8px;
+          margin-right: 8px;
         }
         
         .breaker-header {
@@ -496,12 +486,24 @@ class BreakerPanelCard extends HTMLElement {
           word-break: break-word;
         }
         
+        .unavailable .breaker-title,
+        .unavailable .info-value,
+        .unavailable .info-label,
+        .unavailable .load-text {
+          color: white !important;
+        }
+        
         .info-panel {
           background-color: var(--info-panel-bg);
           border: 1px solid var(--info-panel-border);
           border-radius: 4px;
           padding: 8px;
           margin-top: 8px;
+        }
+        
+        .unavailable .info-panel {
+          background-color: rgba(255, 255, 255, 0.15);
+          border-color: rgba(255, 255, 255, 0.2);
         }
         
         .breaker-info {
@@ -542,11 +544,19 @@ class BreakerPanelCard extends HTMLElement {
           margin-right: 8px;
         }
         
+        .unavailable .load-bar {
+          background-color: rgba(255, 255, 255, 0.3);
+        }
+        
         .load-bar-fill {
           height: 100%;
           width: 0%;
           background-color: var(--success-color, #43a047);
           transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+        }
+        
+        .unavailable .load-bar-fill {
+          background-color: white;
         }
         
         .load-text {
@@ -638,15 +648,10 @@ class BreakerPanelCard extends HTMLElement {
                 </div>
                 <div class="main-breaker-title-container">
                   <div class="main-breaker-title">
-                    ${breaker.name || `Fase ${index === 0 ? 'A' : 'B'}`}
                     ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
+                    ${breaker.name || `Fase ${index === 0 ? 'A' : 'B'}`}
                   </div>
                   <div class="unavailable-message">Dispositivo indisponível</div>
-                  ${isDPS ? `
-                    <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                      <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
-                    </svg>
-                  ` : ''}
                 </div>
               </div>
               <div class="info-panel">
@@ -719,15 +724,10 @@ class BreakerPanelCard extends HTMLElement {
             </div>
             <div class="breaker-title-container">
               <div class="breaker-title">
-                ${breaker.name || `Disjuntor ${index + 1}`}
                 ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
+                ${breaker.name || `Disjuntor ${index + 1}`}
               </div>
               <div class="unavailable-message">Dispositivo indisponível</div>
-              ${isDPS ? `
-                <svg class="dps-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path d="M11 15H6l7-14v8h5l-7 14v-8z"/>
-                </svg>
-              ` : ''}
             </div>
           </div>
           <div class="info-panel">
