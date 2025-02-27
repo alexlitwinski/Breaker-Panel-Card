@@ -76,20 +76,25 @@ class BreakerPanelCard extends HTMLElement {
     unit = unit.toLowerCase(); // Normalizar para comparação
     
     if (unit === "kw" || unit === "kW") {
-      // É kilowatt - mostra 3 casas decimais
-      return power.toFixed(3) + " kW";
+      // É kilowatt - mostrar com precisão adequada e mais compacto
+      return power < 1 ? 
+        power.toFixed(3) + "kW" : 
+        power.toFixed(2) + "kW";
     } else if (unit === "w" || unit === "W") {
-      // É watt - mostra sem casas decimais
+      // É watt - arredondar sem casas decimais
       return power.toFixed(0) + "W";
     } else {
       // Caso não identifique a unidade ou seja outra qualquer
-      // Tenta inferir pela magnitude do valor
+      // Tenta inferir pela magnitude do valor e formata compactamente
       if (power > 1000) {
         // Valor alto provavelmente em watts
         return power.toFixed(0) + "W";
+      } else if (power > 0.1) {
+        // Valores médios com 2 casas
+        return power.toFixed(2) + "kW";
       } else {
-        // Valor baixo provavelmente em kilowatts
-        return power.toFixed(3) + " kW";
+        // Valores pequenos com 3 casas
+        return power.toFixed(3) + "kW";
       }
     }
   }
@@ -306,7 +311,7 @@ class BreakerPanelCard extends HTMLElement {
           position: relative;
           border: 1px solid var(--breaker-border);
           border-radius: 8px;
-          padding: 16px;
+          padding: 12px;
           background-color: var(--main-breaker-bg);
           box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
           transition: all 0.3s ease-in-out;
@@ -372,7 +377,7 @@ class BreakerPanelCard extends HTMLElement {
         .main-breaker-content {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
-          grid-gap: 12px;
+          grid-gap: 8px;
         }
         
         /* Estilo para disjuntores regulares */
@@ -577,6 +582,124 @@ class BreakerPanelCard extends HTMLElement {
         
         .clickable {
           cursor: pointer;
+        }
+        
+        /* Estilos responsivos para telas pequenas */
+        @media screen and (max-width: 600px) {
+          .main-breakers-container {
+            flex-direction: column;
+          }
+          
+          .main-breaker {
+            margin-bottom: 16px;
+            padding: 10px;
+          }
+          
+          .main-breaker-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+          }
+          
+          .main-breaker-content .info-item:nth-child(3) {
+            grid-column: span 2;
+          }
+          
+          .breaker-panel-2-columns {
+            grid-template-columns: 1fr;
+          }
+          
+          .info-value {
+            font-size: 12px;
+          }
+          
+          .info-label {
+            font-size: 10px;
+          }
+          
+          .card-content {
+            padding: 8px;
+          }
+          
+          .breaker-info {
+            grid-template-columns: 1fr 1fr;
+          }
+          
+          .breaker-info .info-item:nth-child(3) {
+            grid-column: span 2;
+          }
+        }
+        
+        /* Para telas extremamente pequenas */
+        @media screen and (max-width: 350px) {
+          .main-breaker-content,
+          .breaker-info {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto auto;
+          }
+          
+          .main-breaker-content .info-item:nth-child(3),
+          .breaker-info .info-item:nth-child(3) {
+            grid-column: 1;
+          }
+          
+          .breaker-handle-container {
+            width: 24px;
+            height: 40px;
+          }
+          
+          .breaker-handle {
+            width: 18px;
+            height: 18px;
+          }
+          
+          .breaker-handle.on {
+            top: 3px;
+          }
+          
+          .breaker-handle.off {
+            top: 19px;
+          }
+          
+          .main-breaker-handle-container {
+            width: 32px;
+            height: 50px;
+          }
+          
+          .main-breaker-handle {
+            width: 24px;
+            height: 23px;
+          }
+          
+          .main-breaker-handle.on {
+            top: 4px;
+          }
+          
+          .main-breaker-handle.off {
+            top: 23px;
+          }
+          
+          .card-header {
+            padding: 6px 10px;
+            font-size: 16px;
+          }
+          
+          .breaker {
+            padding: 8px;
+          }
+          
+          .info-panel {
+            padding: 6px;
+          }
+          
+          .info-value {
+            font-size: 11px;
+          }
+          
+          .info-label {
+            font-size: 9px;
+            margin-bottom: 2px;
+          }
         }
       </style>
     `;
