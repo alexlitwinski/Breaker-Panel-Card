@@ -124,6 +124,12 @@ class BreakerPanelCard extends HTMLElement {
       if (errorMsg) {
         errorMsg.style.display = switchUnavailable ? 'block' : 'none';
       }
+
+      // Mostrar/ocultar botão de reconexão baseado na disponibilidade
+      const reconnectBtn = element.querySelector('.reconnect-btn');
+      if (reconnectBtn && breaker.mac) {
+        reconnectBtn.style.display = switchUnavailable ? 'flex' : 'none';
+      }
     }
 
     // Verificar switch (disjuntor ligado/desligado)
@@ -248,6 +254,15 @@ class BreakerPanelCard extends HTMLElement {
     
     this._hass.callService('switch', service, {
       entity_id: entityId
+    });
+  }
+
+  // Método para reconectar cliente
+  _reconnectClient(mac) {
+    if (!this._hass || !mac) return;
+    
+    this._hass.callService('tplink_omada', 'reconnect_client', {
+      mac: mac
     });
   }
 
@@ -429,6 +444,38 @@ class BreakerPanelCard extends HTMLElement {
           font-size: 11px;
           margin-top: 4px;
           display: none;
+        }
+        
+        .reconnect-btn {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          margin-top: 8px;
+          padding: 8px 12px;
+          background-color: rgba(255, 255, 255, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          border-radius: 4px;
+          color: white;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease-in-out;
+        }
+        
+        .reconnect-btn:hover {
+          background-color: rgba(255, 255, 255, 0.3);
+          border-color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .reconnect-btn:active {
+          transform: scale(0.95);
+        }
+        
+        .reconnect-icon {
+          width: 14px;
+          height: 14px;
+          fill: white;
         }
         
         .dps-badge {
@@ -713,7 +760,12 @@ class BreakerPanelCard extends HTMLElement {
     // Para disjuntores principais
     const mainBreakers = this.shadowRoot.querySelectorAll('.main-breaker.clickable');
     mainBreakers.forEach(breaker => {
-      breaker.addEventListener('click', () => {
+      breaker.addEventListener('click', (e) => {
+        // Não acionar toggle se clicou no botão de reconexão
+        if (e.target.closest('.reconnect-btn')) {
+          return;
+        }
+        
         const entityId = breaker.getAttribute('data-entity-id');
         if (entityId) {
           this._toggleBreaker(entityId);
@@ -724,10 +776,27 @@ class BreakerPanelCard extends HTMLElement {
     // Para disjuntores normais
     const normalBreakers = this.shadowRoot.querySelectorAll('.breaker.clickable');
     normalBreakers.forEach(breaker => {
-      breaker.addEventListener('click', () => {
+      breaker.addEventListener('click', (e) => {
+        // Não acionar toggle se clicou no botão de reconexão
+        if (e.target.closest('.reconnect-btn')) {
+          return;
+        }
+        
         const entityId = breaker.getAttribute('data-entity-id');
         if (entityId) {
           this._toggleBreaker(entityId);
+        }
+      });
+    });
+
+    // Para botões de reconexão
+    const reconnectButtons = this.shadowRoot.querySelectorAll('.reconnect-btn');
+    reconnectButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mac = btn.getAttribute('data-mac');
+        if (mac) {
+          this._reconnectClient(mac);
         }
       });
     });
@@ -777,140 +846,11 @@ class BreakerPanelCard extends HTMLElement {
                   <div class="unavailable-message">Dispositivo indisponível</div>
                 </div>
               </div>
-              <div class="info-panel">
-                <div class="main-breaker-content">
-                  ${breaker.current_entity ? `
-                    <div class="info-item">
-                      <span class="info-label">Corrente</span>
-                      <span class="current-value info-value">0.0A</span>
-                    </div>
-                  ` : ''}
-                  ${breaker.voltage_entity ? `
-                    <div class="info-item">
-                      <span class="info-label">Voltagem</span>
-                      <span class="voltage-value info-value">0V</span>
-                    </div>
-                  ` : ''}
-                  ${breaker.power_entity ? `
-                    <div class="info-item">
-                      <span class="info-label">Potência</span>
-                      <span class="power-value info-value">0W</span>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-              ${breaker.max_current ? `
-                <div class="load-container">
-                  <div class="load-bar">
-                    <div class="load-bar-fill"></div>
-                  </div>
-                  <span class="load-text">0%</span>
+              ${breaker.mac ? `
+                <div class="reconnect-btn" data-mac="${breaker.mac}">
+                  <svg class="reconnect-icon" viewBox="0 0 24 24">
+                    <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                  </svg>
+                  Reconectar
                 </div>
               ` : ''}
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-  }
-
-  // Método para renderizar os disjuntores secundários
-  renderBreakers() {
-    return this.breakers.map((breaker, index) => {
-      // Se for um disjuntor vazio (apenas visual)
-      if (breaker.empty) {
-        return `
-          <div class="breaker empty-breaker">
-            <div class="breaker-title">${breaker.name || 'Sem conexão'}</div>
-          </div>
-        `;
-      }
-
-      // Verificar se é DPS
-      const isDPS = breaker.dps === true;
-      const dpsClass = isDPS ? 'dps' : '';
-      
-      // Verificar se é disjuntor duplo
-      const isDouble = breaker.double === true;
-      const doubleClass = isDouble ? 'double' : '';
-      
-      // Configurar classes
-      const clickable = breaker.switch ? 'clickable' : '';
-      
-      return `
-        <div class="breaker ${dpsClass} ${doubleClass} ${clickable}" 
-            id="breaker-${index}" 
-            data-entity-id="${breaker.switch || ''}">
-          <div class="breaker-header">
-            <div class="breaker-handle-container">
-              <div class="breaker-handle"></div>
-            </div>
-            <div class="breaker-title-container">
-              <div class="breaker-title">
-                ${isDPS ? '<span class="dps-badge">DPS</span>' : ''}
-                ${breaker.name || `Disjuntor ${index + 1}`}
-              </div>
-              <div class="unavailable-message">Dispositivo indisponível</div>
-            </div>
-          </div>
-          <div class="info-panel">
-            <div class="breaker-info">
-              ${breaker.current_entity ? `
-                <div class="info-item">
-                  <span class="info-label">Corrente</span>
-                  <span class="current-value info-value">0.0A</span>
-                </div>
-              ` : ''}
-              ${breaker.voltage_entity ? `
-                <div class="info-item">
-                  <span class="info-label">Voltagem</span>
-                  <span class="voltage-value info-value">0V</span>
-                </div>
-              ` : ''}
-              ${breaker.power_entity ? `
-                <div class="info-item">
-                  <span class="info-label">Potência</span>
-                  <span class="power-value info-value">0W</span>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-          ${breaker.max_current ? `
-            <div class="load-container">
-              <div class="load-bar">
-                <div class="load-bar-fill"></div>
-              </div>
-              <span class="load-text">0%</span>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }).join('');
-  }
-
-  // Define o tamanho do card
-  getCardSize() {
-    const mainBreakersSize = this.mainBreakers.length > 0 ? 2 : 0;
-    
-    // Calcular o tamanho considerando disjuntores duplos
-    let regularBreakersSize = 0;
-    this.breakers.forEach(breaker => {
-      regularBreakersSize += (breaker.double === true) ? 2 : 1;
-    });
-    
-    regularBreakersSize = Math.ceil(regularBreakersSize / this.columns);
-    
-    return mainBreakersSize + regularBreakersSize + 1;
-  }
-}
-
-// Registra o elemento no Custom Elements Registry
-customElements.define('breaker-panel-card', BreakerPanelCard);
-
-// Configura a janela para usar o card
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'breaker-panel-card',
-  name: 'Quadro de Distribuição',
-  description: 'Card que simula um quadro de distribuição de energia com monitoramento de disjuntores.'
-});
